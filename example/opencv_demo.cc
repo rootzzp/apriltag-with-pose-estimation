@@ -70,12 +70,6 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-    // Initialize camera
-    VideoCapture cap(0);
-    if (!cap.isOpened()) {
-        cerr << "Couldn't open video capture device" << endl;
-        return -1;
-    }
 
     // Initialize tag detector with options
     apriltag_family_t *tf = NULL;
@@ -114,8 +108,8 @@ int main(int argc, char *argv[])
     info.det = NULL;
     info.fx = 848.469;   //focal length of x
     info.fy = 847.390;   //focal length of y
-    info.cx = cap.get(CV_CAP_PROP_FRAME_WIDTH)/2;
-    info.cy = cap.get(CV_CAP_PROP_FRAME_HEIGHT)/2;
+    info.cx = 400;
+    info.cy = 400;
 
     apriltag_detector_t *td = apriltag_detector_create();
     apriltag_detector_add_family(td, tf);
@@ -126,78 +120,76 @@ int main(int argc, char *argv[])
     td->refine_edges = getopt_get_bool(getopt, "refine-edges");
 
     Mat frame, gray;
-    while (true) {
-        cap >> frame;
-        cvtColor(frame, gray, COLOR_BGR2GRAY);
+    auto file = "../tag.png";
+    frame = imread(file);
+    cvtColor(frame, gray, COLOR_BGR2GRAY);
 
-        // Make an image_u8_t header for the Mat data
-        image_u8_t im = { .width = gray.cols,
-            .height = gray.rows,
-            .stride = gray.cols,
-            .buf = gray.data
-        };
+    // Make an image_u8_t header for the Mat data
+    image_u8_t im = { .width = gray.cols,
+        .height = gray.rows,
+        .stride = gray.cols,
+        .buf = gray.data
+    };
 
-        zarray_t *detections = apriltag_detector_detect(td, &im);
+    zarray_t *detections = apriltag_detector_detect(td, &im);
 
-        // Draw detection outlines
-        for (int i = 0; i < zarray_size(detections); i++) {
-            apriltag_detection_t *det;
-            zarray_get(detections, i, &det);
-            info.det = det;
-            apriltag_pose_t pose;
-            estimate_tag_pose(&info, &pose);
-            //calculate cam position in world coordinate
-            if (coordinate)
-            {
-                Mat rvec(3, 3, CV_64FC1, pose.R->data); //rotation matrix
-                Mat tvec(3, 1, CV_64FC1, pose.t->data); //translation matrix
-                Mat Pos(3, 3, CV_64FC1);
-                Pos = rvec.inv() * tvec;
-                cout << "x: " << Pos.ptr<double>(0)[0] << endl;
-                cout << "y: " << Pos.ptr<double>(1)[0] << endl;
-                cout << "z: " << Pos.ptr<double>(2)[0] << endl;
-                cout << "-----------world--------------" << endl;
-            }
-            else
-            {
-                cout << "x: " << pose.t ->data[0] << endl;
-                cout << "y: " << pose.t ->data[1] << endl;
-                cout << "z: " << pose.t ->data[2] << endl;
-                cout << "-----------camera-------------" << endl;
-            }
-
-            //draw the line and show tag ID
-            line(frame, Point(det->p[0][0], det->p[0][1]),
-                     Point(det->p[1][0], det->p[1][1]),
-                     Scalar(0, 0xff, 0), 2);
-            line(frame, Point(det->p[0][0], det->p[0][1]),
-                     Point(det->p[3][0], det->p[3][1]),
-                     Scalar(0, 0, 0xff), 2);
-            line(frame, Point(det->p[1][0], det->p[1][1]),
-                     Point(det->p[2][0], det->p[2][1]),
-                     Scalar(0xff, 0, 0), 2);
-            line(frame, Point(det->p[2][0], det->p[2][1]),
-                     Point(det->p[3][0], det->p[3][1]),
-                     Scalar(0xff, 0, 0), 2);
-
-            stringstream ss;
-            ss << det->id;
-            String text = ss.str();
-            int fontface = FONT_HERSHEY_SCRIPT_SIMPLEX;
-            double fontscale = 1.0;
-            int baseline;
-            Size textsize = getTextSize(text, fontface, fontscale, 2,
-                                            &baseline);
-            putText(frame, text, Point(det->c[0]-textsize.width/2,
-                                       det->c[1]+textsize.height/2),
-                    fontface, fontscale, Scalar(0xff, 0x99, 0), 2);
+    // Draw detection outlines
+    for (int i = 0; i < zarray_size(detections); i++) {
+        apriltag_detection_t *det;
+        zarray_get(detections, i, &det);
+        info.det = det;
+        apriltag_pose_t pose;
+        estimate_tag_pose(&info, &pose);
+        //calculate cam position in world coordinate
+        if (coordinate)
+        {
+            Mat rvec(3, 3, CV_64FC1, pose.R->data); //rotation matrix
+            Mat tvec(3, 1, CV_64FC1, pose.t->data); //translation matrix
+            Mat Pos(3, 3, CV_64FC1);
+            Pos = rvec.inv() * tvec;
+            cout << "x: " << Pos.ptr<double>(0)[0] << endl;
+            cout << "y: " << Pos.ptr<double>(1)[0] << endl;
+            cout << "z: " << Pos.ptr<double>(2)[0] << endl;
+            cout << "-----------world--------------" << endl;
         }
-        apriltag_detections_destroy(detections);
+        else
+        {
+            cout << "x: " << pose.t ->data[0] << endl;
+            cout << "y: " << pose.t ->data[1] << endl;
+            cout << "z: " << pose.t ->data[2] << endl;
+            cout << "-----------camera-------------" << endl;
+        }
 
-        imshow("Tag Detections", frame);
-        if (waitKey(30) >= 0)
-            break;
+        //draw the line and show tag ID
+        line(frame, Point(det->p[0][0], det->p[0][1]),
+                    Point(det->p[1][0], det->p[1][1]),
+                    Scalar(0, 0xff, 0), 2);
+        line(frame, Point(det->p[0][0], det->p[0][1]),
+                    Point(det->p[3][0], det->p[3][1]),
+                    Scalar(0, 0, 0xff), 2);
+        line(frame, Point(det->p[1][0], det->p[1][1]),
+                    Point(det->p[2][0], det->p[2][1]),
+                    Scalar(0xff, 0, 0), 2);
+        line(frame, Point(det->p[2][0], det->p[2][1]),
+                    Point(det->p[3][0], det->p[3][1]),
+                    Scalar(0xff, 0, 0), 2);
+
+        stringstream ss;
+        ss << det->id;
+        String text = ss.str();
+        int fontface = FONT_HERSHEY_SCRIPT_SIMPLEX;
+        double fontscale = 1.0;
+        int baseline;
+        Size textsize = getTextSize(text, fontface, fontscale, 2,
+                                        &baseline);
+        putText(frame, text, Point(det->c[0]-textsize.width/2,
+                                    det->c[1]+textsize.height/2),
+                fontface, fontscale, Scalar(0xff, 0x99, 0), 2);
     }
+    apriltag_detections_destroy(detections);
+
+    imshow("Tag Detections", frame);
+    waitKey(0);
 
     apriltag_detector_destroy(td);
 
