@@ -101,15 +101,16 @@ int main(int argc, char *argv[])
         coordinate = 1;
     else
         coordinate = 0;
+    coordinate = 1;
 
 //  input camera intrinsic matrix
     apriltag_detection_info_t info;
-    info.tagsize = 0.146-0.012*4;   //The size of Tag
+    info.tagsize = 0.0625;   //The size of Tag
     info.det = NULL;
-    info.fx = 848.469;   //focal length of x
-    info.fy = 847.390;   //focal length of y
-    info.cx = 400;
-    info.cy = 400;
+    info.fx = 591.797;   //focal length of x
+    info.fy = 591.829;   //focal length of y
+    info.cx = 373.161;
+    info.cy = 203.246;
 
     apriltag_detector_t *td = apriltag_detector_create();
     apriltag_detector_add_family(td, tf);
@@ -120,7 +121,7 @@ int main(int argc, char *argv[])
     td->refine_edges = getopt_get_bool(getopt, "refine-edges");
 
     Mat frame, gray;
-    auto file = "../tag.png";
+    auto file = "../TY0913/-5.png";
     frame = imread(file);
     cvtColor(frame, gray, COLOR_BGR2GRAY);
 
@@ -131,12 +132,49 @@ int main(int argc, char *argv[])
         .buf = gray.data
     };
 
-    zarray_t *detections = apriltag_detector_detect(td, &im);
-
     // Draw detection outlines
-    for (int i = 0; i < zarray_size(detections); i++) {
-        apriltag_detection_t *det;
-        zarray_get(detections, i, &det);
+    for (int i = 0; i < 1; i++) {
+        apriltag_detection_t *det = new apriltag_detection_t;
+        det->p[0][0] = 314;
+        det->p[0][1] = 93;
+        det->p[1][0] = 422;
+        det->p[1][1] = 79;
+        det->p[2][0] = 449;
+        det->p[2][1] = 186;
+        det->p[3][0] = 338;
+        det->p[3][1] = 207;
+        vector<Point2f> pts_src;
+        pts_src.push_back(Point2f(314, 93));
+        pts_src.push_back(Point2f(422, 79));
+        pts_src.push_back(Point2f(449, 186));
+        pts_src.push_back(Point2f(338, 207));
+        vector<Point2f> pts_dst;
+        pts_dst.push_back(Point2f(-1, -1));
+        pts_dst.push_back(Point2f(1, -1));
+        pts_dst.push_back(Point2f(1, 1));
+        pts_dst.push_back(Point2f(-1, 1));
+        Mat h = Mat( 3, 3,CV_32FC1,Scalar( 0));
+        h = findHomography(pts_dst,pts_src);
+        //cout<<h<<endl;
+        Vec3f pt(314, 93, 1.0);
+        //cout<<h.inv()<<endl;
+        Mat inv = h.inv();
+        inv.convertTo(inv, CV_32F);
+        auto res = inv * pt;
+        //cout<<res<<endl;
+
+        det->H = matd_create(3, 3);
+        MATD_EL(det->H, 0, 0) = h.at<float>(0, 0);
+        MATD_EL(det->H, 0, 1) = h.at<float>(0, 1);
+        MATD_EL(det->H, 0, 2) = h.at<float>(0, 2);
+        MATD_EL(det->H, 1, 0) = h.at<float>(1, 0);
+        MATD_EL(det->H, 1, 1) = h.at<float>(1, 1);
+        MATD_EL(det->H, 1, 2) = h.at<float>(1, 2);
+        MATD_EL(det->H, 2, 0) = h.at<float>(2, 0);
+        MATD_EL(det->H, 2, 1) = h.at<float>(2, 1);
+        MATD_EL(det->H, 2, 2) = h.at<float>(2, 2);
+ 
+
         info.det = det;
         apriltag_pose_t pose;
         estimate_tag_pose(&info, &pose);
@@ -145,6 +183,8 @@ int main(int argc, char *argv[])
         {
             Mat rvec(3, 3, CV_64FC1, pose.R->data); //rotation matrix
             Mat tvec(3, 1, CV_64FC1, pose.t->data); //translation matrix
+            cout<<rvec<<endl;
+            cout<<tvec<<endl;
             Mat Pos(3, 3, CV_64FC1);
             Pos = rvec.inv() * tvec;
             cout << "x: " << Pos.ptr<double>(0)[0] << endl;
@@ -173,20 +213,7 @@ int main(int argc, char *argv[])
         line(frame, Point(det->p[2][0], det->p[2][1]),
                     Point(det->p[3][0], det->p[3][1]),
                     Scalar(0xff, 0, 0), 2);
-
-        stringstream ss;
-        ss << det->id;
-        String text = ss.str();
-        int fontface = FONT_HERSHEY_SCRIPT_SIMPLEX;
-        double fontscale = 1.0;
-        int baseline;
-        Size textsize = getTextSize(text, fontface, fontscale, 2,
-                                        &baseline);
-        putText(frame, text, Point(det->c[0]-textsize.width/2,
-                                    det->c[1]+textsize.height/2),
-                fontface, fontscale, Scalar(0xff, 0x99, 0), 2);
     }
-    apriltag_detections_destroy(detections);
 
     imshow("Tag Detections", frame);
     waitKey(0);

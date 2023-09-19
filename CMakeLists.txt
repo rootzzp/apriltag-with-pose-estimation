@@ -151,5 +151,12 @@ if(OpenCV_FOUND)
     install(TARGETS opencv_demo RUNTIME DESTINATION bin)
 endif(OpenCV_FOUND)
 
+if(OpenCV_FOUND)
+    add_executable(my_demo example/my_demo.cc)
+    target_link_libraries(my_demo apriltag ${OpenCV_LIBRARIES})
+    set_target_properties(my_demo PROPERTIES CXX_STANDARD 11)
+    install(TARGETS my_demo RUNTIME DESTINATION bin)
+endif(OpenCV_FOUND)
+
 # install example programs
 install(TARGETS apriltag_demo RUNTIME DESTINATION bin)
